@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension translationdomain="inkscape-silhouette" xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Silhouette Cut Contour</name>
+  <id>com.github.fablabnbg.inkscape-silhouette.silhouette-outline</id>
+  <dependency type="executable" location="inx">silhouette_outline.py</dependency>
+  <param name="tab" type="notebook">
+    <page name="settings" gui-text="Settings">
+      <param name="offset" type="float" min="0.0" max="50.0" precision="2" gui-text="Distance from artwork to cut line [mm]">1.5</param>
+      <param name="mode" type="optiongroup" appearance="combo" gui-text="What is one design">
+        <option value="objects">Each object / group (selected, or in visible layers)</option>
+        <option value="islands">Automatic: separate by empty space</option>
+      </param>
+      <param name="join" type="float" min="0.0" max="20.0" precision="2" gui-text="Automatic mode: join parts closer than [mm]">0.5</param>
+      <param name="one_piece" type="bool" gui-text="Keep each design in one piece (one contour around separate parts)">true</param>
+      <param name="one_piece_max" type="float" min="0.0" max="200.0" precision="1" gui-text="Largest gap bridged inside a design [mm]">25</param>
+      <param name="merge_cuts" type="bool" gui-text="Merge neighbouring cuts into a single line">true</param>
+      <param name="merge" type="float" min="0.0" max="20.0" precision="2" gui-text="Merge cut lines closer than [mm]">2.0</param>
+      <label indent="2">Designs closer than twice the distance share the space between them, so the cuts never cross. With merging on, the blade runs once along the line between two neighbours instead of twice, and cut lines closer than the merge distance become one.</label>
+      <param name="gap" type="float" min="0.0" max="10.0" precision="2" gui-text="Without merging: minimum distance between neighbouring cuts [mm]">0.0</param>
+      <param name="layer_name" type="string" gui-text="Contour layer name">Cut contour</param>
+      <param name="replace" type="bool" gui-text="Replace contours from a previous run">true</param>
+      <param name="mark_print" type="bool" gui-text="Add '(print)' to the artwork layer names">true</param>
+      <label indent="2">Send to Silhouette skips layers whose name contains 'print', so only the contours are cut.</label>
+    </page>
+    <page name="advanced" gui-text="Advanced">
+      <param name="resolution" type="float" min="2.0" max="40.0" precision="1" gui-text="Precision [pixels per mm]">10</param>
+      <param name="simplify" type="float" min="0.0" max="1.0" precision="3" gui-text="Simplification tolerance [mm]">0.03</param>
+      <param name="min_area" type="float" min="0.0" max="1000.0" precision="1" gui-text="Ignore contours smaller than [mm²]">2.0</param>
+      <param name="color" type="string" gui-text="Contour colour">#ff0000</param>
+    </page>
+    <page name="help" gui-text="Help">
+      <label>Creates a closed cut line around every design, at the given distance from the ink. Holes inside a design are not cut.</label>
+      <label>Select the designs to outline, or select nothing to outline everything in the visible layers. Each top-level object or group is one design: group the parts of a design (Ctrl+G) first, or use the automatic mode when the whole sheet is a single path.</label>
+      <label>Text and bitmaps are ignored: convert them to paths first.</label>
+    </page>
+  </param>
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Render"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">silhouette_outline.py</command>
+  </script>
+</inkscape-extension>

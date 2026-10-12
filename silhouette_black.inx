@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension translationdomain="inkscape-silhouette" xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Silhouette Solid Black</name>
+  <id>com.github.fablabnbg.inkscape-silhouette.silhouette-black</id>
+  <dependency type="executable" location="inx">silhouette_black.py</dependency>
+  <param name="tab" type="notebook">
+    <page name="settings" gui-text="Settings">
+      <param name="mode" type="optiongroup" appearance="combo" gui-text="Method">
+        <option value="auto">Automatic (recolour if possible, otherwise trace)</option>
+        <option value="trace">Always trace (composite colours, then vectorise)</option>
+        <option value="recolor">Only recolour the vectors black</option>
+      </param>
+      <param name="threshold" type="float" min="0.05" max="0.95" precision="2" gui-text="Darkness from which a colour becomes black (0-1)">0.5</param>
+      <param name="resolution" type="float" min="2.0" max="80.0" precision="1" gui-text="Trace precision [pixels per mm]">20</param>
+    </page>
+    <page name="help" gui-text="Help">
+      <label>Converts the selected artwork to solid black for single-colour printing (e.g. temporary tattoos).</label>
+      <label>If every colour is darker than the threshold, the vectors are simply recoloured black. Otherwise the artwork is rendered as it looks: darker points become black, lighter points (white, light colours) become no ink, so white details on top of dark areas become holes. The result is traced into one black path.</label>
+      <label>A lower threshold keeps lighter colours as black. Doubtful results (light colours dropped, areas only told apart by colour merged, nearly everything black) are reported.</label>
+    </page>
+  </param>
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Render"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">silhouette_black.py</command>
+  </script>
+</inkscape-extension>

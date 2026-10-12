@@ -7,13 +7,16 @@
     <option value="standard">Standard (square + two L-marks)</option>
     <option value="four_corner">4 corner (four L-marks, e.g. Cameo 5 Alpha)</option>
   </param>
-  <param name="regoriginx" type="float" min="10.0" max="10000" gui-text="Position of regmark from document left [mm]">10</param>
-  <param name="regoriginy" type="float" min="10.0" max="10000" gui-text="Position of regmark from document top [mm]">10</param>
+  <param name="regoriginx" type="float" min="10.0" max="10000" precision="2" gui-text="Position of regmark from document left [mm]">15.88</param>
+  <param name="regoriginy" type="float" min="10.0" max="10000" precision="2" gui-text="Position of regmark from document top [mm]">15.88</param>
   <label indent="2">Spacing of the registration mark edges</label>
-  <param name="regwidth" type="float" min="0.0" max="10000" gui-text="X mark to mark distance [mm]"></param>
-  <param name="reglength" type="float" min="0.0" max="10000" gui-text="Y mark to mark distance [mm]"></param>
+  <param name="regwidth" type="float" min="0.0" max="10000" gui-text="X mark to mark distance [mm] (0 = from the page size)">0</param>
+  <param name="reglength" type="float" min="0.0" max="10000" gui-text="Y mark to mark distance [mm] (0 = from the page size)">0</param>
   <label indent="2">Distance between registration mark edges</label>
   <label indent="2">Note: If width and length spacing is zero, then it is calculated from current document size.</label>
+  <param name="mark_length" type="float" min="5.0" max="40.0" precision="1" gui-text="Mark length [mm]">20</param>
+  <param name="mark_thickness" type="float" min="0.1" max="2.0" precision="2" gui-text="Mark line thickness [mm]">0.5</param>
+  <label indent="2">Bolder marks (e.g. 1 mm thick, 25 mm long) are easier for a weak sensor to find. Send to Silhouette reads both values from the Regmarks layer and tells the cutter.</label>
   <param name="verbose" type="bool" gui-text="display verbose log messages">false</param>
   <effect>
     <object-type>all</object-type>

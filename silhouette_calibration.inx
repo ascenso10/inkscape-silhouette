@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension translationdomain="inkscape-silhouette" xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Silhouette Calibration Sheet</name>
+  <id>com.github.fablabnbg.inkscape-silhouette.silhouette-calibration</id>
+  <dependency type="executable" location="inx">silhouette_calibration.py</dependency>
+  <param name="tab" type="notebook">
+    <page name="settings" gui-text="Settings">
+      <param name="inset" type="float" min="10.0" max="60.0" precision="1" gui-text="Distance of the targets from the page edges [mm]">25</param>
+      <param name="max_width" type="float" min="0.0" max="2000.0" precision="1" gui-text="Keep targets within this width [mm] (0 = page width)">195</param>
+      <label indent="2">For a Portrait 3 use 195 mm, as it cannot cut further across.</label>
+    </page>
+    <page name="help" gui-text="Help">
+      <label>For cutting printed sheets without registration marks. Creates five targets: printed millimetre scales and cut lines at the nominal positions.</label>
+      <label>Print with the 'Calibration cut' layer hidden, put the sheet in the top-left corner of the mat grid, cut with registration marks off, then read where the cuts cross the scales. Enter minus the average reading as X-Offset / Y-Offset in Send to Silhouette.</label>
+    </page>
+  </param>
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Render"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">silhouette_calibration.py</command>
+  </script>
+</inkscape-extension>

@@ -280,7 +280,7 @@ class SendtoSilhouette(EffectExtension):
         pars.add_argument("-T", "--toolholder",
                 choices=("1", "2"), dest = "toolholder", default = None, help="[1..2]")
         pars.add_argument("--preview",
-                dest = "preview", type = Boolean, default = True,
+                dest = "preview", type = Boolean, default = False,
                 help="show cut pattern graphically before sending")
         pars.add_argument("-V", "--version",
                 dest = "version", action = "version", version=__version__,
@@ -295,6 +295,39 @@ class SendtoSilhouette(EffectExtension):
         pars.add_argument("-R", "--regmark",
                 dest = "regmark", type = Boolean, default = False,
                 help="The document has registration marks.")
+        pars.add_argument("--reg_mark_length",
+                dest = "reg_mark_length", type = float, default = 0.0,
+                help="Length of the registration mark arms [mm] (0 = from the Regmarks layer, else 20)")
+        pars.add_argument("--reg_mark_thickness",
+                dest = "reg_mark_thickness", type = float, default = 0.0,
+                help="Line thickness of the registration marks [mm] (0 = from the Regmarks layer, else 0.5)")
+        pars.add_argument("--regsearch_retries",
+                dest = "regsearch_retries", type = int, default = 4,
+                help="If the marks are not found, search again this many times around the expected position")
+        pars.add_argument("--regmark_diagnostics",
+                dest = "regmark_diagnostics", type = Boolean, default = True,
+                help="Log the cutter's extra replies and its Regmark Query (FQ5) answer after each mark search")
+        pars.add_argument("--regsearch_offset_x",
+                dest = "regsearch_offset_x", type = float, default = 0.0,
+                help="Shift where the cutter looks for the marks, to the right [mm] (compensates how the mat sits)")
+        pars.add_argument("--regsearch_offset_y",
+                dest = "regsearch_offset_y", type = float, default = 0.0,
+                help="Shift where the cutter looks for the marks, downwards [mm]")
+        pars.add_argument("--regsearch_jitter",
+                dest = "regsearch_jitter", type = float, default = 1.5,
+                help="Shift of the expected mark position between retries [mm]")
+        pars.add_argument("--regsearch_margin",
+                dest = "regsearch_margin", type = float, default = 5.9,
+                help="Start searching for the registration marks this many mm before them")
+        pars.add_argument("--regmark_test_runs",
+                dest = "regmark_test_runs", type = int, default = 0,
+                help="Only test the registration mark search this many times, without cutting (0 = normal cut)")
+        pars.add_argument("--regmark_test_sweep",
+                dest = "regmark_test_sweep", type = float, default = 0.0,
+                help="Test only: instead of repeating, move the search over a 5x5 grid with this step [mm] (0 = off)")
+        pars.add_argument("--regmark_test_between",
+                dest = "regmark_test_between", type = str, default = "",
+                help="Test only: commands sent between searches, ';'-separated (ESC04 = escape byte 04, WAIT2 = 2 s)")
         pars.add_argument("--regsearch",
                 dest = "regsearch", type = Boolean, default = False,
                 help="Search for the registration marks.")
@@ -329,7 +362,7 @@ class SendtoSilhouette(EffectExtension):
                 help = "Override hardware model of cutting device.")
         pars.add_argument("--connection_type",
                 choices=("usb", "bluetooth", "ble"),
-                dest = "connection_type", default = "usb",
+                dest = "connection_type", default = None,
                 help = "Connection type: usb, bluetooth (Classic/RFCOMM), or ble.")
         pars.add_argument("--bluetooth_addr",
                 dest = "bluetooth_addr", default = None,
@@ -898,7 +931,27 @@ class SendtoSilhouette(EffectExtension):
         media_height = self.media_height_mm or convert_unit(self.svg.viewport_height, "mm")
         self.reg_width    = self.options.regwidth or self.doc_reg_width or media_width - self.reg_origin_X * 2
         self.reg_length   = self.options.reglength or self.doc_reg_length or media_height - self.reg_origin_Y * 2
-        self.report(f"Using Registration Mark:: mark distance from document: Left={self.reg_origin_X}mm, Top={self.reg_origin_Y}mm; mark to mark distance: X={self.reg_width}mm, Y={self.reg_length}mm;", 'log')
+        doc_len, doc_thick = self.doc_regmark_style()
+        self.reg_mark_length = self.options.reg_mark_length or doc_len or 20.0
+        self.reg_mark_thickness = self.options.reg_mark_thickness or doc_thick or 0.5
+        self.report(f"Using Registration Mark:: mark distance from document: Left={self.reg_origin_X}mm, Top={self.reg_origin_Y}mm; mark to mark distance: X={self.reg_width}mm, Y={self.reg_length}mm; mark length={self.reg_mark_length}mm; mark thickness={self.reg_mark_thickness}mm;", 'log')
+
+    def doc_regmark_style(self):
+        """Mark length and thickness written by the Regmarks renderer, or (0, 0)."""
+        length = thickness = 0.0
+        for group in self.svg.iter():
+            if not isinstance(group, Group) or not group.label or "regmark" not in group.label.lower():
+                continue
+            notes = " ".join("".join(node.itertext()) for node in group.iter() if isinstance(node, TextElement))
+            m = re.search(r"mark length\s*=\s*([0-9.]+)\s*mm", notes)
+            if m:
+                length = float(m.group(1))
+            m = re.search(r"mark thickness\s*=\s*([0-9.]+)\s*mm", notes)
+            if m:
+                thickness = float(m.group(1))
+            if length or thickness:
+                break
+        return length, thickness
 
     @staticmethod
     def is_closed_path(path) -> bool:
@@ -1131,7 +1184,7 @@ class SendtoSilhouette(EffectExtension):
             self.report(f"# docname: {self.svg.name}", 'log')
             self.report(cut, 'log')
 
-        if self.options.preview:
+        if self.options.preview and not self.options.regmark_test_runs:
             extraText = None
             if self.options.regmark:
                 extraText = f"Registration mark to origin distance: Left={self.reg_origin_X}mm, Top={self.reg_origin_Y}mm;\n Registration mark to mark distance: X={self.reg_width}mm, Y={self.reg_length}mm;"
@@ -1153,9 +1206,12 @@ class SendtoSilhouette(EffectExtension):
             self.options.bluetooth_name = None
         if not self.options.bluetooth_identifier:
             self.options.bluetooth_identifier = None
-        if (self.options.connection_type == "usb" and
-                self.options.bluetooth_addr is not None):
-            self.options.connection_type = "bluetooth"
+        # Only when no connection type was given at all: the Inkscape dialog
+        # always passes one, and remembers the MAC address even when USB is
+        # chosen, so an explicit "usb" must not be overridden.
+        if self.options.connection_type is None:
+            self.options.connection_type = (
+                "bluetooth" if self.options.bluetooth_addr is not None else "usb")
 
         use_ble = self.options.connection_type == "ble"
         if self.options.connection_type == "bluetooth":
@@ -1203,6 +1259,25 @@ class SendtoSilhouette(EffectExtension):
                 speed=self.options.speed,
                 skip_init=self.options.skip_init)
 
+        if self.options.regmark_test_runs and self.options.regmark_test_runs > 0:
+            result = dev.regmark_test(runs=self.options.regmark_test_runs,
+                    reglength=self.reg_length,
+                    regwidth=self.reg_width,
+                    regoriginx=self.reg_origin_X,
+                    regoriginy=self.reg_origin_Y,
+                    regsearch_margin=self.options.regsearch_margin,
+                    reg_mark_length=self.reg_mark_length,
+                    reg_mark_thickness=self.reg_mark_thickness,
+                    regsearch_offset_x=self.options.regsearch_offset_x,
+                    regsearch_offset_y=self.options.regsearch_offset_y,
+                    quadregmarks=self.options.quadregmarks,
+                    regmark_diagnostics=self.options.regmark_diagnostics,
+                    sweep_step=self.options.regmark_test_sweep,
+                    between=self.options.regmark_test_between)
+            # shown in Inkscape's dialog as well as in the log
+            self.report(result["summary"] + " Nothing was cut.", 'error')
+            return
+
         if self.options.autocrop:
             # this takes much longer, if we have a complext drawing
             bbox = dev.plot(pathlist=cut,
@@ -1214,6 +1289,14 @@ class SendtoSilhouette(EffectExtension):
                     endposition="start",
                     regmark=self.options.regmark,
                     regsearch=self.options.regsearch,
+                    regsearch_margin=self.options.regsearch_margin,
+                    reg_mark_length=self.reg_mark_length,
+                    reg_mark_thickness=self.reg_mark_thickness,
+                    regsearch_retries=self.options.regsearch_retries,
+                    regsearch_jitter=self.options.regsearch_jitter,
+                    regmark_diagnostics=self.options.regmark_diagnostics,
+                    regsearch_offset_x=self.options.regsearch_offset_x,
+                    regsearch_offset_y=self.options.regsearch_offset_y,
                     quadregmarks=self.options.quadregmarks,
                     regwidth=self.reg_width,
                     reglength=self.reg_length,
@@ -1239,6 +1322,14 @@ class SendtoSilhouette(EffectExtension):
             end_paper_offset=self.options.end_offset,
             regmark=self.options.regmark,
             regsearch=self.options.regsearch,
+            regsearch_margin=self.options.regsearch_margin,
+            reg_mark_length=self.reg_mark_length,
+            reg_mark_thickness=self.reg_mark_thickness,
+            regsearch_retries=self.options.regsearch_retries,
+            regsearch_jitter=self.options.regsearch_jitter,
+            regmark_diagnostics=self.options.regmark_diagnostics,
+            regsearch_offset_x=self.options.regsearch_offset_x,
+            regsearch_offset_y=self.options.regsearch_offset_y,
             quadregmarks=self.options.quadregmarks,
             regwidth=self.reg_width,
             reglength=self.reg_length,

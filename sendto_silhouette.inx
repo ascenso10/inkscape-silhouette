@@ -9,9 +9,9 @@
       <param name="x_off" type="float" min="-999.0" max="999.0" precision="2" translatable="no" gui-text="X-Offset [mm]">0.0</param>
       <param name="y_off" type="float" min="-999.0" max="999.0" precision="2" translatable="no" gui-text="Y-Offset [mm]">0.0</param>
       <param name="cuttingmat" type="optiongroup" appearance="combo" gui-text="Cutting Mat">
+        <option translatable="no" value="portrait_8x12">Portrait 8x12</option>
         <option translatable="no" value="cameo_12x12">Cameo 12x12</option>
         <option translatable="no" value="cameo_12x24">Cameo 12x24</option>
-        <option translatable="no" value="portrait_8x12">Portrait 8x12</option>
         <option translatable="no" value="portrait_8_5x12">Portrait 4 8.5x12</option>
         <option translatable="no" value="cameo_plus_15x15">Cameo Plus 15x15</option>
         <option translatable="no" value="cameo_pro_24x24">Cameo Pro 24x24</option>
@@ -30,6 +30,7 @@
       <label indent="2">'pen' executes the strokes exactly as sent, 'cut' adds small serifs to help the knive find its orientation at corners.</label>
       <!-- CAUTION: keep media list in sync with silhouette/Graphtec.py -->
       <param name="media" type="optiongroup" appearance="combo" gui-text="Media">
+        <option value="132">[P= 5,S=10,D=1] Print Paper Light Weight</option>
         <option value="300">[P>0 S>0 D>=0] Custom: use non-zero Pressure and Speed below</option>
         <option value="100">[P=27,S=10,D=1] SCard without Craft Paper Backing</option>
         <option value="101">[P=27,S=10,D=1] Card with Craft Paper Backing</option>
@@ -50,7 +51,6 @@
         <option value="129">[P=27,S=10,D=1] Inkjet Photo Paper 45-75 lbs (110g)</option>
         <option value="130">[P=30,S= 3,D=1] Magnetic Sheet</option>
         <option value="131">[P=30,S=10,D=1] Offset 24-60 lbs (90g)</option>
-        <option value="132">[P= 5,S=10,D=1] Print Paper Light Weight</option>
         <option value="133">[P=25,S=10,D=1] Print Paper Medium Weight</option>
         <option value="134">[P=20,S=10,D=1] Sticker Sheet</option>
         <option value="135">[P=20,S=10,D=1] Tag 100 lbs (275g)</option>
@@ -62,7 +62,7 @@
       <param name="speed" type="int" min="0" max="30" gui-text="Speed">0</param>
       <param name="depth" type="int" min="-1" max="10" gui-text="Blade Depth (for AutoBlade)">-1</param>
       <label indent="2">Use pressure=0, speed=0, depth=-1 to take the media defaults. Pressure values of 19 or more could trigger the trackenhancing feature, which means a movement along the full media height before start. Beware.</label>
-      <param name="preview" type="bool" gui-text="Preview: show cut pattern before sending">true</param>
+      <param name="preview" type="bool" gui-text="Preview: show cut pattern before sending">false</param>
       <label indent="2">Note that for Preview to operate, the `matplotlib' package for Python must be installed.</label>
     </page>
     <page name='opt' gui-text='Options'>
@@ -82,14 +82,25 @@
     </page>
 
     <page name='reg' gui-text='Regmarks'>
-      <param name="regmark" type="bool" gui-text="The document has registration marks">false</param>
+      <param name="regmark" type="bool" gui-text="The document has registration marks">true</param>
       <label indent="2">The document contains printed registration marks</label>
-      <param name="regsearch" type="bool" gui-text="Search for the registration marks automatically">false</param>
+      <param name="regsearch" type="bool" gui-text="Search for the registration marks automatically">true</param>
+      <param name="regsearch_margin" type="float" min="0.0" max="20.0" precision="1" gui-text="Start the search this many mm before the marks">5.9</param>
+      <param name="regsearch_offset_x" type="float" min="-20.0" max="20.0" precision="1" gui-text="Look for the marks shifted right by [mm]">0.0</param>
+      <param name="regsearch_offset_y" type="float" min="-20.0" max="20.0" precision="1" gui-text="Look for the marks shifted down by [mm]">0.0</param>
+      <param name="regsearch_retries" type="int" min="0" max="12" gui-text="If not found, search again this many times">4</param>
+      <param name="regmark_diagnostics" type="bool" gui-text="Log the cutter's detailed answers after each search (diagnostics)">true</param>
+      <param name="regsearch_jitter" type="float" min="0.0" max="5.0" precision="1" gui-text="Shift between search attempts [mm]">1.5</param>
+      <param name="regmark_test_runs" type="int" min="0" max="50" gui-text="Test only: search the marks this many times without cutting (0 = cut normally)">0</param>
+      <param name="regmark_test_sweep" type="float" min="0.0" max="5.0" precision="1" gui-text="Test only: move the search over a 5x5 grid with this step [mm] (0 = off)">0.0</param>
+      <param name="regmark_test_between" type="string" gui-text="Test only: commands sent between searches (e.g. ESC04;TB99)"></param>
+      <param name="reg_mark_length" type="float" min="0.0" max="50.0" precision="1" gui-text="Mark length [mm] (0 = from the Regmarks layer)">0</param>
+      <param name="reg_mark_thickness" type="float" min="0.0" max="3.0" precision="2" gui-text="Mark thickness [mm] (0 = from the Regmarks layer)">0</param>
       <label indent="2">Search for the registration marks automatically. Seems on some devices there is another mode, where you can set the references manually.</label>
       <param name="quadregmarks" type="bool" gui-text="Use 4 registration marks">false</param>
       <label indent="2">On the Cameo 5α/plus and pro mk-ii, registration marks in 4 corners can be used. Has no effect on other devices.</label>
-      <param name="regoriginx" type="float" min="0.0" max="10000" gui-text="Position of regmark from document left [mm]">10</param>
-      <param name="regoriginy" type="float" min="0.0" max="10000" gui-text="Position of regmark from document top [mm]">10</param>
+      <param name="regoriginx" type="float" min="0.0" max="10000" gui-text="Position of regmark from document left [mm] (0 = read from the Regmarks layer)">0</param>
+      <param name="regoriginy" type="float" min="0.0" max="10000" gui-text="Position of regmark from document top [mm] (0 = read from the Regmarks layer)">0</param>
       <label indent="2">Distance of the registration mark edges</label>
       <label indent="2">Note: If mark offset from document top and left spacing is zero, then it is calculated from Regmark layer.</label>
       <param name="regwidth" type="float" min="0.0" max="10000" gui-text="X mark to mark distance [mm]">0</param>
@@ -167,13 +178,13 @@ Minimal Traveling (no reverse): Like fully optimized but respect original orient
 
     <page name='bluetooth' gui-text='Bluetooth'>
       <param name="connection_type" type="optiongroup" appearance="combo" gui-text="Connection type">
-        <option value="usb">USB</option>
         <option value="bluetooth">Bluetooth Classic (RFCOMM)</option>
+        <option value="usb">USB</option>
         <option value="ble">Bluetooth Low Energy (BLE)</option>
       </param>
       <param name="bluetooth_scan" type="bool" gui-text="Scan for nearby devices (list, then stop)">false</param>
       <label indent="2">Scanning lists every device visible through the selected Bluetooth transport. It is not limited to Silhouette cutters.</label>
-      <param name="bluetooth_addr" type="string" gui-text="Bluetooth MAC address"></param>
+      <param name="bluetooth_addr" type="string" gui-text="Bluetooth MAC address">00:1B:41:BC:E8:7C</param>
       <label indent="2">Bluetooth Classic only. Pair the cutter with the operating system, scan, then enter its MAC address.</label>
       <param name="bluetooth_name" type="string" gui-text="BLE advertised name">CAMEO</param>
       <label indent="2">Bluetooth LE only. Defaults to CAMEO. Prefer the advertised name because it works across operating systems.</label>

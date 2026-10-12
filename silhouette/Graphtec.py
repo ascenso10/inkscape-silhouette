@@ -309,9 +309,11 @@ def _match_bluetooth_hardware(model_string):
   """
   if not model_string:
     return None
-  needle = model_string.strip().upper()
+  # Ignore spaces: firmware reports e.g. "Portrait 3 V1.05" for the Portrait 3.
+  needle = model_string.strip().upper().replace(" ", "")
   for name, product_id in BLUETOOTH_NAME_TO_PRODUCT_ID:
-    if needle.startswith(name) or name in needle:
+    key = name.replace(" ", "")
+    if needle.startswith(key) or key in needle:
       return _hardware_by_product_id(product_id)
   return None
 
@@ -858,6 +860,47 @@ Alternatively, you can add yourself to group 'lp' and logout/login.""" % (self.h
   def send_escape(self, esc, is_query=False):
     """ Sends a Escape Command """
     self.write(CMD_ESC + esc, is_query=is_query) # Concatenation will typecheck
+
+  def _collect_input(self, seconds):
+    """Read whatever the cutter sends during the next few seconds."""
+    got = []
+    if self.transport is None:
+      return got
+    end = time.time() + seconds
+    while time.time() < end:
+      try:
+        data = self.transport.read_bytes(64, 200)
+      except Exception:
+        continue
+      if data:
+        got.append(bytes(data))
+    return got
+
+  def _regmark_diagnostics(self):
+    """Log extra replies after a mark search and the answer to the Regmark
+    Query (FQ5) that Silhouette Studio sends after searching. Read-only."""
+    extra = self._collect_input(1.5)
+    print("regmark diagnostics: further replies after the search: %r" % extra, file=self.log)
+    try:
+      self.send_command("FQ5", is_query=True)
+      replies = self._collect_input(2.0)
+    except Exception as e:
+      replies = ["error: %s" % e]
+    print("regmark diagnostics: FQ5 (Regmark Query) -> %r" % replies, file=self.log)
+
+  def _drain_input(self):
+    """Discard replies still waiting from the cutter (e.g. late answers over
+    Bluetooth), so that the next read gets the answer to the next command."""
+    if self.transport is None:
+      return
+    for _ in range(10):
+      try:
+        data = self.transport.read_bytes(64, 100)
+      except Exception:
+        return
+      if not data:
+        return
+      print("discarded stale data from cutter: %r" % (bytes(data),), file=self.log)
 
   def read(self, size=64, timeout=5000):
     """Low level read method, returns response as bytes"""
@@ -1470,10 +1513,124 @@ Alternatively, you can add yourself to group 'lp' and logout/login.""" % (self.h
     return plotcmds
 
 
+  def regmark_test(self, runs=10, reglength=277.0, regwidth=180.0, regoriginx=10.0, regoriginy=10.0,
+                   regsearch_margin=0.0, reg_mark_length=20.0, reg_mark_thickness=0.5,
+                   regsearch_offset_x=0.0, regsearch_offset_y=0.0, quadregmarks=False,
+                   regmark_diagnostics=False, pause=1.0, sweep_step=0.0, sweep_rings=2, between=""):
+    """Search the registration marks `runs` times without cutting anything.
+
+    Every run sends exactly the same commands as a real Print & Cut job
+    (one attempt at the expected position, no retries), records the cutter's
+    answer and how long the search took, and the head is parked at the end.
+    With sweep_step > 0 the search position is moved over a grid around the
+    expected position instead (sweep_rings rings of sweep_step mm, nearest
+    first), one search per point, stopping at the first point where the marks
+    are found or where the cutter gives up and ejects the media (answer 1).
+    `between` lists commands sent before every run after the first, separated
+    by ';' (e.g. "ESC04;TB99"); ESCxx sends the escape byte xx (hex), WAITn
+    pauses n seconds. Used to find which command clears the cutter's state.
+    Returns a dict with the list of runs and a one-line summary."""
+    if not 'quadregmarks' in self.hardware or self.hardware['quadregmarks'] == False:
+      quadregmarks = False
+    if sweep_step and sweep_step > 0:
+      n = int(sweep_rings)
+      grid = [(i * sweep_step, j * sweep_step) for i in range(-n, n + 1) for j in range(-n, n + 1)]
+      shifts = sorted(grid, key=lambda d: (max(abs(d[0]), abs(d[1])), abs(d[0]) + abs(d[1])))
+    else:
+      shifts = [(0.0, 0.0)] * int(runs)
+    runs = len(shifts)
+
+    def search_cmd(dx, dy):
+      top = max(regoriginy - regsearch_margin + regsearch_offset_y + dy, 0)
+      left = max(regoriginx - regsearch_margin + regsearch_offset_x + dx, 0)
+      if quadregmarks:
+        return self.automatic_quad_regmark_test_mm_cmd(reglength, regwidth, top, left)
+      return self.automatic_regmark_test_mm_cmd(reglength, regwidth, top, left)
+
+    print("regmark test: %d run(s)%s of %s (marks at left=%g top=%g mm, X=%g Y=%g mm, "
+          "mark length %g mm, thickness %g mm)"
+          % (runs, " sweeping %g mm steps" % sweep_step if sweep_step else "", search_cmd(0, 0),
+             regoriginx, regoriginy, regwidth, reglength, reg_mark_length, reg_mark_thickness),
+          file=self.log)
+    between_cmds = [c.strip() for c in (between or "").split(";") if c.strip()]
+    if between_cmds:
+      print("regmark test: before runs 2..%d send %s" % (runs, between_cmds), file=self.log)
+    results = []
+    for run, (dx, dy) in enumerate(shifts, 1):
+      cmd = search_cmd(dx, dy)
+      if run > 1:
+        for c in between_cmds:
+          if c.upper().startswith("ESC"):
+            self.send_escape(bytes.fromhex(c[3:]))
+          elif c.upper().startswith("WAIT"):
+            time.sleep(float(c[4:] or 1))
+          else:
+            self.send_command(c)
+        if between_cmds:
+          extra = self._collect_input(1.0)
+          if extra:
+            print("regmark test: replies to the between commands: %r" % extra, file=self.log)
+      self._drain_input()
+      self.send_command("TB50,0")
+      self.send_command("TB99")
+      self.send_command("TB52,2")
+      self.send_command("TB51,%d" % _mm_2_SU(reg_mark_length))
+      self.send_command("TB53,%d" % _mm_2_SU(reg_mark_thickness))
+      self.send_command("TB55,1")
+      t0 = time.time()
+      self.send_command(cmd)
+      resp = self.read(timeout=40000)
+      seconds = time.time() - t0
+      if resp is None:
+        answer = "timeout"
+      else:
+        answer = resp.decode("ascii", "replace").replace("\x03", "").strip() or repr(resp)
+      found = (answer == "0")
+      results.append({"run": run, "answer": answer, "found": found, "seconds": seconds, "dx": dx, "dy": dy})
+      print("regmark test run %d/%d: %s answer %s (%s) after %.1f s"
+            % (run, runs, "shift right %+g mm, down %+g mm:" % (dx, dy) if sweep_step else "",
+               answer, "FOUND" if found else "not found", seconds), file=self.log)
+      if regmark_diagnostics:
+        self._regmark_diagnostics()
+      if sweep_step and (found or answer == "1"):
+        break
+      if pause:
+        time.sleep(pause)
+
+    # park the head as at the end of a normal job
+    if self.product_id() in PRODUCT_LINE_CAMEO3_ON:
+      self.send_command(["L0", self.upper_left_mm_cmd(0, 0), self.move_mm_cmd(0, 0), "J0", "FN0", "TB50,0"])
+    else:
+      self.send_command("H")
+
+    found = sum(1 for r in results if r["found"])
+    answers = {}
+    for r in results:
+      answers[r["answer"]] = answers.get(r["answer"], 0) + 1
+    times = [r["seconds"] for r in results]
+    summary = ("Registration mark test: found %d of %d (%d%%). Answers: %s. Search time %.1f-%.1f s."
+               % (found, len(results), (100 * found // len(results)) if results else 0,
+                  ", ".join("'%s' x%d" % (k, v) for k, v in sorted(answers.items())),
+                  min(times) if times else 0, max(times) if times else 0))
+    if sweep_step:
+      hit = [r for r in results if r["found"]]
+      if hit:
+        summary += (" FOUND with the search shifted right %+g mm, down %+g mm: set these as "
+                    "'Look for the marks shifted right / down'." % (hit[0]["dx"], hit[0]["dy"]))
+      elif results and results[-1]["answer"] == "1":
+        summary += (" Sweep stopped at shift right %+g mm, down %+g mm: the cutter answered 1 "
+                    "(searched fully, gave up)." % (results[-1]["dx"], results[-1]["dy"]))
+    print(summary, file=self.log)
+    return {"runs": results, "found": found, "summary": summary}
+
+
   def plot(self, mediawidth=210.0, mediaheight=297.0, margintop=None,
            marginleft=None, pathlist=None, offset=None, bboxonly=False,
            end_paper_offset=0, endposition='below', regmark=False, regsearch=False,
-           regwidth=180, reglength=230, regoriginx=15.0, regoriginy=20.0, quadregmarks=False, skip_init=False, skip_reset=False):
+           regwidth=180, reglength=230, regoriginx=15.0, regoriginy=20.0, quadregmarks=False, skip_init=False, skip_reset=False,
+           regsearch_margin=10.0, reg_mark_length=20.0, reg_mark_thickness=0.5,
+           regsearch_retries=0, regsearch_jitter=1.5, regmark_diagnostics=False,
+           regsearch_offset_x=0.0, regsearch_offset_y=0.0):
     """plot sends the pathlist to the device (real or dummy) and computes the
        bounding box of the pathlist, which is returned.
 
@@ -1548,33 +1705,58 @@ Alternatively, you can add yourself to group 'lp' and logout/login.""" % (self.h
       width = regwidth
 
     if regmark and not skip_init:
-      self.send_command("TB50,0") #only with registration (it was TB50,1), landscape mode
-      self.send_command("TB99")
-      self.send_command("TB52,2")     #type of regmarks: 0='Original,SD', 2='Cameo,Portrait'
-      self.send_command("TB51,400")   # length of regmarks
-      self.send_command("TB53,10")    # width of regmarks
-      self.send_command("TB55,1")
+      if regsearch and 'width_mm' in self.hardware and regoriginx + regwidth > self.hardware['width_mm'] - 5:
+        print("WARNING: the right-hand registration marks are at %g mm, but this cutter only reaches "
+              "about %g mm across; reduce the X mark-to-mark distance so they stay at least 5 mm inside."
+              % (regoriginx + regwidth, self.hardware['width_mm']), file=self.log)
 
-      if regsearch:
-        # automatic regmark test
-        # add a search range of 10mm
-        if quadregmarks:
-          self.send_command(self.automatic_quad_regmark_test_mm_cmd(reglength, regwidth, max(regoriginy - 10, 0), max(regoriginx - 10, 0)))
+      # The first attempt searches where the marks should be. Further attempts
+      # (regsearch_retries) shift the expected position by regsearch_jitter mm
+      # around it, which helps cutters whose sensor only looks at a small area.
+      offsets = [(0.0, 0.0)]
+      j = float(regsearch_jitter or 0)
+      if regsearch and regsearch_retries and j > 0:
+        ring = [(j, 0), (0, j), (-j, 0), (0, -j), (j, j), (-j, -j), (j, -j), (-j, j),
+                (2 * j, 0), (0, 2 * j), (-2 * j, 0), (0, -2 * j)]
+        offsets += ring[:int(regsearch_retries)]
+
+      resp = None
+      for attempt, (dx, dy) in enumerate(offsets, 1):
+        self._drain_input()
+        self.send_command("TB50,0") #only with registration (it was TB50,1), landscape mode
+        self.send_command("TB99")
+        self.send_command("TB52,2")     #type of regmarks: 0='Original,SD', 2='Cameo,Portrait'
+        self.send_command("TB51,%d" % _mm_2_SU(reg_mark_length))     # length of regmarks
+        self.send_command("TB53,%d" % _mm_2_SU(reg_mark_thickness))  # width (thickness) of regmarks
+        self.send_command("TB55,1")
+
+        if regsearch:
+          # automatic regmark search, starting regsearch_margin mm before the first mark
+          search_top = max(regoriginy - regsearch_margin + regsearch_offset_y + dy, 0)
+          search_left = max(regoriginx - regsearch_margin + regsearch_offset_x + dx, 0)
+          if quadregmarks:
+            cmd = self.automatic_quad_regmark_test_mm_cmd(reglength, regwidth, search_top, search_left)
+          else:
+            cmd = self.automatic_regmark_test_mm_cmd(reglength, regwidth, search_top, search_left)
+          print("regmark search %d/%d: %s (marks at left=%g top=%g mm, search starts at left=%g top=%g mm, "
+                "mark length %g mm, thickness %g mm)"
+                % (attempt, len(offsets), cmd, regoriginx, regoriginy, search_left, search_top,
+                   reg_mark_length, reg_mark_thickness), file=self.log)
+          self.send_command(cmd)
         else:
-          self.send_command(self.automatic_regmark_test_mm_cmd(reglength, regwidth, max(regoriginy - 10, 0), max(regoriginx - 10, 0)))
-      else:
-        # manual regmark
-        self.send_command(self.manual_regmark_mm_cmd(reglength, regwidth))
+          # manual regmark
+          self.send_command(self.manual_regmark_mm_cmd(reglength, regwidth))
 
-      #while True:
-      #  s.write("\1b\05") #request status
-      #  resp = s.read(timeout=1000)
-      #  if resp != "    1\x03":
-      #    break;
+        resp = self.read(timeout=40000) ## Allow 40s for reply...
+        print("regmark search response: %r" % resp, file=self.log)
+        if regmark_diagnostics:
+          self._regmark_diagnostics()
+        if resp == b"    0\x03" or not regsearch:
+          break
 
-      resp = self.read(timeout=40000) ## Allow 20s for reply...
       if resp != b"    0\x03":
-        raise ValueError("Couldn't find registration marks. %s" % str(resp))
+        raise ValueError("Couldn't find registration marks after %d attempt(s). Last answer from the cutter: %s"
+                         % (len(offsets), str(resp)))
 
       ## Looks like if the reg marks work it gets 3 messages back (if it fails it times out because it only gets the first message)
       #resp = s.read(timeout=40000) ## Allow 20s for reply...

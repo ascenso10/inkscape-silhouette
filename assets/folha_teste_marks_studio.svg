@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="210mm" height="297mm" viewBox="0 0 210 297" version="1.1" id="svg1">
+  <sodipodi:namedview id="namedview1" inkscape:document-units="mm"/>
+  <g inkscape:groupmode="layer" id="regmark" inkscape:label="Regmarks" sodipodi:insensitive="true">
+    <rect id="regmark-tl" x="15.88" y="15.88" width="5" height="5" style="fill:#000000;stroke:none"/>
+    <path id="regmark-tr" d="M 174.12,15.88 L 194.12,15.88 L 194.12,35.88" style="fill:none;stroke:#000000;stroke-width:0.5;stroke-linecap:butt;stroke-linejoin:miter"/>
+    <path id="regmark-bl" d="M 35.88,281.12 L 15.88,281.12 L 15.88,261.12" style="fill:none;stroke:#000000;stroke-width:0.5;stroke-linecap:butt;stroke-linejoin:miter"/>
+    <text id="regmark-notes" x="40" y="240" style="font-size:2.5px;font-family:sans-serif">mark distance from document: Left=15.88mm, Top=15.88mm; mark to mark distance: X=178.24mm, Y=265.24mm; mark length=20.0mm; mark thickness=0.5mm; </text>
+  </g>
+  <g inkscape:groupmode="layer" id="layer-print" inkscape:label="Print">
+    <text x="40" y="60" style="font-size:7px;font-family:sans-serif;font-weight:bold">Folha de teste - marks como o Studio (15,88 mm)</text>
+    <text x="40" y="72" style="font-size:4.2px;font-family:sans-serif">Imprimir a 100 % (tamanho real), preto, melhor qualidade. Nao cortar esta folha.</text>
+    <text x="40" y="80" style="font-size:4.2px;font-family:sans-serif">Marks: 15,88 mm da margem, X = 178.24 mm, Y = 265.24 mm, 20 mm x 0,5 mm.</text>
+    <text x="40" y="88" style="font-size:4.2px;font-family:sans-serif">Send to Silhouette &gt; Regmarks: "Test only ..." = 10.</text>
+    <text x="40" y="106" style="font-size:4.2px;font-family:sans-serif;font-weight:bold">Registo (o que mudou em cada ronda):</text>
+    <text x="40" y="120" style="font-size:4.2px;font-family:sans-serif">Ronda 1: ______________________  encontradas ____ / ____</text><text x="40" y="129" style="font-size:4.2px;font-family:sans-serif">Ronda 2: ______________________  encontradas ____ / ____</text><text x="40" y="138" style="font-size:4.2px;font-family:sans-serif">Ronda 3: ______________________  encontradas ____ / ____</text><text x="40" y="147" style="font-size:4.2px;font-family:sans-serif">Ronda 4: ______________________  encontradas ____ / ____</text><text x="40" y="156" style="font-size:4.2px;font-family:sans-serif">Ronda 5: ______________________  encontradas ____ / ____</text><text x="40" y="165" style="font-size:4.2px;font-family:sans-serif">Ronda 6: ______________________  encontradas ____ / ____</text><text x="40" y="174" style="font-size:4.2px;font-family:sans-serif">Ronda 7: ______________________  encontradas ____ / ____</text><text x="40" y="183" style="font-size:4.2px;font-family:sans-serif">Ronda 8: ______________________  encontradas ____ / ____</text>
+  </g>
+</svg>

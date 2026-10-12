@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension translationdomain="inkscape-silhouette" xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Silhouette Sheet Layout</name>
+  <id>com.github.fablabnbg.inkscape-silhouette.silhouette-layout</id>
+  <dependency type="executable" location="inx">silhouette_layout.py</dependency>
+  <param name="tab" type="notebook">
+    <page name="design" gui-text="Design">
+      <param name="size" type="float" min="1.0" max="1000.0" precision="1" gui-text="Tattoo size [mm]">50</param>
+      <param name="size_axis" type="optiongroup" appearance="combo" gui-text="Size applies to">
+        <option value="width">Width</option>
+        <option value="height">Height</option>
+        <option value="longest">Longest side</option>
+      </param>
+      <param name="copies" type="int" min="0" max="10000" gui-text="Number of copies (0 = fill the sheet)">0</param>
+      <param name="mirror" type="bool" gui-text="Mirror (tattoo transfer paper)">true</param>
+      <param name="black" type="optiongroup" appearance="combo" gui-text="Convert to solid black">
+        <option value="auto">Automatic (recolour if possible, otherwise trace)</option>
+        <option value="trace">Always trace (composite colours, then vectorise)</option>
+        <option value="recolor">Only recolour the vectors black</option>
+        <option value="off">Off (keep colours and bitmaps)</option>
+      </param>
+      <param name="threshold" type="float" min="0.05" max="0.95" precision="2" gui-text="Darkness from which a colour becomes black (0-1)">0.5</param>
+      <label indent="2">Select the customer's logo (vector or bitmap) and press Apply. It is moved into a master kept in the document definitions and repeated as clones in the "Print" layer.</label>
+    </page>
+    <page name="packing" gui-text="Packing">
+      <param name="gap" type="float" min="0.0" max="50.0" precision="2" gui-text="Minimum distance between copies [mm]">3.0</param>
+      <param name="cut_offset" type="float" min="0.0" max="20.0" precision="2" gui-text="Cut line distance from the artwork [mm]">1.5</param>
+      <param name="rotate" type="bool" gui-text="Allow turning the design 90°">true</param>
+      <param name="alternate" type="bool" gui-text="Allow every other row / column turned 180°">true</param>
+      <label indent="2">Turning every other row 180° lets shapes interlock and usually fits more copies.</label>
+      <param name="one_piece" type="bool" gui-text="Keep each design in one piece">true</param>
+      <label indent="2">A design made of separate parts is treated as one piece, so copies never slip between the parts of another copy. Use the same setting in Cut Contour.</label>
+      <param name="layer_name" type="string" gui-text="Print layer name">Print</param>
+      <param name="replace" type="bool" gui-text="Replace a previous layout in that layer">true</param>
+    </page>
+    <page name="area" gui-text="Usable area">
+      <param name="area" type="optiongroup" appearance="combo" gui-text="Usable area">
+        <option value="regmarks">Inside the registration marks</option>
+        <option value="margin">Page with a margin</option>
+      </param>
+      <label indent="2">With registration marks, marks already drawn by "Silhouette Regmarks" are used; otherwise the values below.</label>
+      <param name="reg_left" type="float" min="0.0" max="1000.0" precision="2" gui-text="Mark position from the left [mm]">15.88</param>
+      <param name="reg_top" type="float" min="0.0" max="1000.0" precision="2" gui-text="Mark position from the top [mm]">15.88</param>
+      <param name="mark_len" type="float" min="1.0" max="50.0" precision="1" gui-text="Mark length [mm]">20</param>
+      <param name="mark_clear" type="float" min="0.0" max="20.0" precision="1" gui-text="Clearance around the marks [mm]">1</param>
+      <param name="quad" type="bool" gui-text="4 registration marks">false</param>
+      <param name="margin" type="float" min="0.0" max="100.0" precision="1" gui-text="Margin (without marks) [mm]">5</param>
+    </page>
+  </param>
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="Render"/>
+    </effects-menu>
+  </effect>
+  <script>
+    <command location="inx" interpreter="python">silhouette_layout.py</command>
+  </script>
+</inkscape-extension>

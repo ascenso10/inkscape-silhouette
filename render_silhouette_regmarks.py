@@ -82,8 +82,10 @@ class InsertRegmark(EffectExtension):
 		# Parse arguments
 		pars.add_argument("-X", "--reg-x", "--regwidth",  type = float, dest = "regwidth",   default = 0.0, help="X mark to mark distance [mm]")
 		pars.add_argument("-Y", "--reg-y", "--reglength", type = float, dest = "reglength",  default = 0.0, help="Y mark to mark distance [mm]")
-		pars.add_argument("--rego-x",  "--regoriginx",    type = float, dest = "regoriginx", default = 10.0,  help="X mark origin from left [mm]")
-		pars.add_argument("--rego-y", "--regoriginy",     type = float, dest = "regoriginy", default = 10.0,  help="X mark origin from top [mm]")
+		pars.add_argument("--rego-x",  "--regoriginx",    type = float, dest = "regoriginx", default = 15.88,  help="X mark origin from left [mm]")
+		pars.add_argument("--rego-y", "--regoriginy",     type = float, dest = "regoriginy", default = 15.88,  help="Y mark origin from top [mm]")
+		pars.add_argument("--mark_length", dest = "mark_length", type = float, default = REG_LINE_MM, help="length of the mark arms [mm]")
+		pars.add_argument("--mark_thickness", dest = "mark_thickness", type = float, default = REG_MARK_LINE_WIDTH_MM, help="line thickness of the marks [mm]")
 		pars.add_argument("--regstyle", dest = "regstyle", type = str, default = REGSTYLE_STANDARD, help="registration mark style (standard or four_corner)")
 		pars.add_argument("--verbose", dest = "verbose",  type = Boolean, default = False, help="enable log messages")
 
@@ -91,9 +93,9 @@ class InsertRegmark(EffectExtension):
 		# Build an L-shaped corner mark: a horizontal and a vertical arm meeting
 		# at (corner_x, corner_y). h_dir/v_dir (+1 or -1) point the arms inward.
 		path = [
-			(corner_x + h_dir * REG_LINE_MM, corner_y),
+			(corner_x + h_dir * self.options.mark_length, corner_y),
 			(corner_x, corner_y),
-			(corner_x, corner_y + v_dir * REG_LINE_MM),
+			(corner_x, corner_y + v_dir * self.options.mark_length),
 		]
 		return PathElement.new(path="M"+str(path), id=mark_id, style=f"fill:none; stroke:black; stroke-width:{line_width};")
 
@@ -179,6 +181,8 @@ class InsertRegmark(EffectExtension):
 		reg_width = self.options.regwidth or page_width - reg_origin_X * 2
 		reg_length = self.options.reglength or page_height - reg_origin_Y * 2
 		reg_style = self.options.regstyle
+		mark_len = self.options.mark_length
+		mark_w = self.options.mark_thickness
 		ids = self.regmark_ids(page_index, page_count)
 
 		if self.options.verbose == True:
@@ -205,45 +209,45 @@ class InsertRegmark(EffectExtension):
 		bottom_left_y = reg_origin_Y + reg_length
 
 		if reg_style == REGSTYLE_FOUR_CORNER:
-			mark_group.append(self.l_mark(reg_origin_X, reg_origin_Y, +1, +1, ids["top_left"], REG_MARK_LINE_WIDTH_MM))
+			mark_group.append(self.l_mark(reg_origin_X, reg_origin_Y, +1, +1, ids["top_left"], mark_w))
 		else:
 			mark_group.append(Rectangle.new(left=reg_origin_X, top=reg_origin_Y, width=REG_SQUARE_MM, height=REG_SQUARE_MM, id=ids["top_left"], style='fill:black;'))
 
-		mark_group.append(self.l_mark(top_right_x, reg_origin_Y, -1, +1, ids["top_right"], REG_MARK_LINE_WIDTH_MM))
-		mark_group.append(self.l_mark(reg_origin_X, bottom_left_y, +1, -1, ids["bottom_left"], REG_MARK_LINE_WIDTH_MM))
+		mark_group.append(self.l_mark(top_right_x, reg_origin_Y, -1, +1, ids["top_right"], mark_w))
+		mark_group.append(self.l_mark(reg_origin_X, bottom_left_y, +1, -1, ids["bottom_left"], mark_w))
 		if reg_style == REGSTYLE_FOUR_CORNER:
-			mark_group.append(self.l_mark(top_right_x, bottom_left_y, -1, -1, ids["bottom_right"], REG_MARK_LINE_WIDTH_MM))
+			mark_group.append(self.l_mark(top_right_x, bottom_left_y, -1, -1, ids["bottom_right"], mark_w))
 
-		safearea_left_x = reg_origin_X + REG_LINE_MM
-		safearea_top_y = reg_origin_Y + REG_LINE_MM
-		safearea_right_x = reg_origin_X + reg_width - REG_LINE_MM
-		safearea_bottom_y = reg_origin_Y + reg_length - REG_LINE_MM
+		safearea_left_x = reg_origin_X + mark_len
+		safearea_top_y = reg_origin_Y + mark_len
+		safearea_right_x = reg_origin_X + reg_width - mark_len
+		safearea_bottom_y = reg_origin_Y + reg_length - mark_len
 		if reg_style == REGSTYLE_FOUR_CORNER:
 			bottom_right_corner = [
-				(safearea_right_x + REG_SAFE_AREA_MM, safearea_bottom_y),
+				(safearea_right_x + mark_len, safearea_bottom_y),
 				(safearea_right_x, safearea_bottom_y),
-				(safearea_right_x, safearea_bottom_y + REG_SAFE_AREA_MM),
+				(safearea_right_x, safearea_bottom_y + mark_len),
 			]
 		else:
 			bottom_right_corner = [
-				(safearea_right_x + REG_SAFE_AREA_MM, safearea_bottom_y + REG_SAFE_AREA_MM),
+				(safearea_right_x + mark_len, safearea_bottom_y + mark_len),
 			]
 		safe_area_points = [
-			(safearea_left_x - REG_SAFE_AREA_MM, safearea_top_y),
+			(safearea_left_x - mark_len, safearea_top_y),
 			(safearea_left_x, safearea_top_y),
-			(safearea_left_x, safearea_top_y - REG_SAFE_AREA_MM),
-			(safearea_right_x, safearea_top_y - REG_SAFE_AREA_MM),
+			(safearea_left_x, safearea_top_y - mark_len),
+			(safearea_right_x, safearea_top_y - mark_len),
 			(safearea_right_x, safearea_top_y),
-			(safearea_right_x + REG_SAFE_AREA_MM, safearea_top_y),
+			(safearea_right_x + mark_len, safearea_top_y),
 		] + bottom_right_corner + [
-			(safearea_left_x, safearea_bottom_y + REG_SAFE_AREA_MM),
+			(safearea_left_x, safearea_bottom_y + mark_len),
 			(safearea_left_x, safearea_bottom_y),
-			(safearea_left_x - REG_SAFE_AREA_MM, safearea_bottom_y),
+			(safearea_left_x - mark_len, safearea_bottom_y),
 		]
 		mark_group.append(PathElement.new(path="M" + str(safe_area_points) + "Z", id=ids["safe_area"], style='fill:white;stroke:none;'))
 
-		safe_area_note = f"mark distance from document: Left={reg_origin_X}mm, Top={reg_origin_Y}mm; mark to mark distance: X={reg_width}mm, Y={reg_length}mm; "
-		mark_group.append(TextElement(safe_area_note, x=f"{(safearea_left_x + 3)}", y=f"{(safearea_bottom_y + (REG_SAFE_AREA_MM + reg_origin_Y / 2))}", id=ids["notes"], style=f"font-size:{REG_MARK_INFO_FONT_SIZE_PX}px;"))
+		safe_area_note = f"mark distance from document: Left={reg_origin_X}mm, Top={reg_origin_Y}mm; mark to mark distance: X={reg_width}mm, Y={reg_length}mm; mark length={mark_len}mm; mark thickness={mark_w}mm; "
+		mark_group.append(TextElement(safe_area_note, x=f"{(safearea_left_x + 3)}", y=f"{(safearea_bottom_y + (mark_len + reg_origin_Y / 2))}", id=ids["notes"], style=f"font-size:{REG_MARK_INFO_FONT_SIZE_PX}px;"))
 
 	def effect(self):
 		pages = self.get_document_pages()

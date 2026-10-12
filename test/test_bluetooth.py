@@ -99,6 +99,12 @@ class MatchBluetoothHardwareTest(unittest.TestCase):
             _match_bluetooth_hardware("CAMEO3 V1")["product_id"],
             PRODUCT_ID_SILHOUETTE_CAMEO3)
 
+    def test_matches_firmware_with_space_in_model_number(self):
+        # The Portrait 3 reports "Portrait 3 V1.05" over Bluetooth.
+        hw = _match_bluetooth_hardware("Portrait 3 V1.05    ")
+        self.assertIsNotNone(hw)
+        self.assertEqual(hw["name"], "Silhouette_Portrait3")
+
     def test_case_insensitive(self):
         self.assertEqual(
             _match_bluetooth_hardware("cameo 5 alpha v1.02")["product_id"],
