@@ -4,6 +4,7 @@
   <id>com.github.fablabnbg.inkscape-silhouette.sendto_silhouette</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="inx">sendto_silhouette.py</dependency>
+  <param name="progress_window" type="bool" gui-hidden="true">true</param>
   <param name="active-tab" type="notebook">
     <page name='silhouette' translatable="no" gui-text='Silhouette'>
       <param name="x_off" type="float" min="-999.0" max="999.0" precision="2" translatable="no" gui-text="X-Offset [mm]">0.0</param>
