@@ -55,6 +55,7 @@ from silhouette.convert2dashes import convert2dash
 import silhouette.StrategyMinTraveling
 import silhouette.read_dump
 from silhouette.Geometry import dist_sq, XY_a
+from silhouette.ProgressWindow import ProgressWindow
 
 # Temporary Monkey Backport Patches to support functions that exist only after v1.2
 # TODO: If support for Inkscape v1.1 is dropped then this backport can be removed
@@ -121,6 +122,7 @@ class SendtoSilhouette(EffectExtension):
         self.docTransform = Transform()
         self.cmdfile = None
         self.caffeinate_process = None
+        self.progress_window = None
         self.document_pages = None
         self.active_page_indices = []
         self.media_width_mm = None
@@ -197,6 +199,17 @@ class SendtoSilhouette(EffectExtension):
         except Exception as error:
             self.report_sleep_inhibitor(
                 "Could not stop macOS sleep prevention: %s" % error)
+
+
+    def set_progress_status(self, text):
+        """Show the current step in the progress window, if there is one."""
+        if self.progress_window:
+            self.progress_window.set_status(text)
+
+    def close_progress_window(self):
+        if self.progress_window:
+            self.progress_window.close()
+            self.progress_window = None
 
 
     def add_arguments(self, pars):
@@ -282,6 +295,9 @@ class SendtoSilhouette(EffectExtension):
         pars.add_argument("--preview",
                 dest = "preview", type = Boolean, default = False,
                 help="show cut pattern graphically before sending")
+        pars.add_argument("--progress_window",
+                dest = "progress_window", type = Boolean, default = False,
+                help="show a progress window while the job runs")
         pars.add_argument("-V", "--version",
                 dest = "version", action = "version", version=__version__,
                 help="print the version number and exit")
@@ -984,6 +1000,8 @@ class SendtoSilhouette(EffectExtension):
         perc = 100.*done/total
         if time.time() - self.write_start_tstamp < 1.0:
             self.device_buffer_perc = perc
+        if self.progress_window:
+            self.progress_window.set_progress(perc)
         buf = ""
         if self.device_buffer_perc > 1.0:
             buf = " (+%d%%)" % (self.device_buffer_perc+.5)
@@ -1083,6 +1101,7 @@ class SendtoSilhouette(EffectExtension):
         try:
             return self._effect()
         finally:
+            self.close_progress_window()
             self.stop_macos_sleep_inhibitor()
 
     def _effect(self):
@@ -1091,6 +1110,9 @@ class SendtoSilhouette(EffectExtension):
         self.log = open(log_path, mode)
         if self.tty:
             self.log = teeFile(self.tty, self.log)
+
+        if self.options.progress_window:
+            self.progress_window = ProgressWindow()
 
         if self.options.cmdfile:
             mode = "ab" if self.options.append_logs else "wb"
@@ -1101,8 +1123,11 @@ class SendtoSilhouette(EffectExtension):
         # Bluetooth device scan: list cutters and stop, before doing any work
         # that depends on the document geometry or a connected device.
         if self.options.bluetooth_scan:
+            self.set_progress_status(gettext("Scanning for Bluetooth devices..."))
             self.report_bluetooth_scan()
             return
+
+        self.set_progress_status(gettext("Reading document..."))
 
         # Init docTransform
         self.initDocScale()
@@ -1142,6 +1167,8 @@ class SendtoSilhouette(EffectExtension):
         if self.options.tool == "autoblade":
             self.pen=False
             self.autoblade=True
+
+        self.set_progress_status(gettext("Optimizing cut paths..."))
 
         # Reorder paths (except in case of Z-order)
         if self.options.orient_paths != "natural":
@@ -1188,9 +1215,13 @@ class SendtoSilhouette(EffectExtension):
             extraText = None
             if self.options.regmark:
                 extraText = f"Registration mark to origin distance: Left={self.reg_origin_X}mm, Top={self.reg_origin_Y}mm;\n Registration mark to mark distance: X={self.reg_width}mm, Y={self.reg_length}mm;"
+            # The progress window must not cover the preview.
+            self.close_progress_window()
             if silhouette.read_dump.show_plotcuts(cut, buttons=True, extraText=extraText) > 0:
                 self.report("Preview aborted.", 'log')
                 return
+            if self.options.progress_window:
+                self.progress_window = ProgressWindow()
 
         if self.options.pressure == 0:
             self.options.pressure = None
@@ -1223,6 +1254,7 @@ class SendtoSilhouette(EffectExtension):
             bluetooth_addr = None
 
         self.start_macos_sleep_inhibitor()
+        self.set_progress_status(gettext("Connecting to cutter..."))
         try:
             dev = SilhouetteCameo(log=self.log, progress_cb=self.writeProgress,
                                   cmdfile=self.cmdfile,
@@ -1279,6 +1311,7 @@ class SendtoSilhouette(EffectExtension):
             return
 
         if self.options.autocrop:
+            self.set_progress_status(gettext("Calculating trim margins..."))
             # this takes much longer, if we have a complext drawing
             bbox = dev.plot(pathlist=cut,
                     mediawidth=self.media_width_mm,
@@ -1313,6 +1346,12 @@ class SendtoSilhouette(EffectExtension):
                     self.options.x_off -= bbox["bbox"]["llx"]*bbox["unit"]
                     self.options.y_off -= bbox["bbox"]["ury"]*bbox["unit"]
 
+        if (self.options.regmark and self.options.regsearch and
+                not self.options.skip_init):
+            self.set_progress_status(gettext(
+                "Searching for registration marks, then sending job to cutter..."))
+        else:
+            self.set_progress_status(gettext("Sending job to cutter..."))
         bbox = dev.plot(pathlist=cut,
             mediawidth=self.media_width_mm,
             mediaheight=self.media_height_mm,
@@ -1365,6 +1404,7 @@ class SendtoSilhouette(EffectExtension):
             while ((self.options.wait_done or
                     self.caffeinate_process is not None) and
                     state == "moving"):
+                self.set_progress_status(gettext("Waiting for cutter to finish..."))
                 time.sleep(wait_sec)
                 self.device_buffer_perc -= wait_sec * percent_per_sec
                 if self.device_buffer_perc < 0.0:

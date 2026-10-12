@@ -149,6 +149,8 @@ Note: with registration marks the cutter only cuts inside the rectangle formed b
   - Note: In Multi Action, you can select the color you want settings to apply to and then set all the same parameters, but with potentially different settings for each color. You can also change the order in which the colors are cut, and uncheck the box in the "Perform Action?" column to ignore a color altogether.
 7. To start the cut, in "Send to Silhouette, click the "Apply" button; in "Silhouette Multi" click the "Execute" button.
 
+Note: while Send to Silhouette runs, a small "Send to Silhouette" progress window shows the current step (reading the document, optimizing paths, connecting, sending) and, while the job is sent, the percentage sent. It closes before the preview opens and comes back when you click Cut. Inkscape's own "working, please wait" dialog stays open until the job ends. The progress window needs Python's `tkinter`; if `tkinter` is not available, the job runs without it.
+
 
 ### Plot with registration marks steps
 
